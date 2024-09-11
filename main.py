@@ -92,6 +92,29 @@ def copeQuiz(leaf):
     """处理答题任务"""
 
 
+def copeLeaf(leaf):
+    """处理leaf"""
+    if (id := str(leaf["id"])) in ykt.progess:
+        progess_ = ykt.progess[id]
+        if isinstance(progess_, dict):
+            # 题目类
+            leaf["progess"] = progess_["done"] / progess_["total"]
+        else:
+            leaf["progess"] = progess_
+    else:
+        leaf["progess"] = 0
+    if leaf["progess"] != 1:
+        # 未完成的任务
+        if leaf["leaf_type"] == 0:
+            copeVedio(leaf)
+        elif leaf["leaf_type"] == 4:
+            return
+            # copeDiscuss(leaf)
+        elif leaf["leaf_type"] == 6:
+            return
+            # copeQuiz(leaf)
+
+
 def copeAct(activities):
     """处理全部活动"""
     for act in activities:
@@ -108,25 +131,10 @@ def copeAct(activities):
         # leafTypeDict = {0: "视频", 4: "讨论", 6: "作业"}
         for charter in ykt.content:
             for leaf in charter["leaf_list"]:
-                if (id := str(leaf["id"])) in ykt.progess:
-                    progess_ = ykt.progess[id]
-                    if isinstance(progess_, dict):
-                        # 题目类
-                        leaf["progess"] = progess_["done"] / progess_["total"]
-                    else:
-                        leaf["progess"] = progess_
-                else:
-                    leaf["progess"] = 0
-                if leaf["progess"] != 1:
-                    # 未完成的任务
-                    if leaf["leaf_type"] == 0:
-                        copeVedio(leaf)
-                    elif leaf["leaf_type"] == 4:
-                        continue
-                        # copeDiscuss(leaf)
-                    elif leaf["leaf_type"] == 6:
-                        continue
-                        # copeQuiz(leaf)
+                copeLeaf(leaf)
+            for section in charter["section_list"]:
+                for leaf in section["leaf_list"]:
+                    copeLeaf(leaf)
 
 
 def copeCourse():
