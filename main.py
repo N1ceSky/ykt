@@ -51,6 +51,8 @@ def delay(left=10, right=20):
     动态更新的输出
     倒计时结束自动清空控制台输出
     """
+    # 隐藏控制台光标
+    print("\x1b[?25l", end="")
     sleepTime = random.randint(left, right)
     for i in range(sleepTime, 0, -1):
         print(
@@ -59,6 +61,8 @@ def delay(left=10, right=20):
         time.sleep(1)
     # 清空控制台输出
     print(" " * 10 + "\r", end="")
+    # 显示控制台光标1
+    print("\x1b[?25h", end="")
     return sleepTime
 
 
@@ -194,7 +198,7 @@ def copeQuiz(leaf):
             if ProblemType == 4:
                 answer = {}
                 for blank in problemInfo["Blanks"]:
-                    answer[str(blank["Num"])] = input(f"第{blank["Num"]}空：").strip()
+                    answer[str(blank["Num"])] = input(f"第{blank['Num']}空：").strip()
             else:
                 answer = choice(ProblemType, options)
 

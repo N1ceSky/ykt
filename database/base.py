@@ -1,57 +1,67 @@
-import sqlite3
+import re
 
-from .common import DATABASE_PATH
+import requests
+
+URL = "http://122.51.89.123/tiku/api/v1"
+
+
+def format_string(string):
+    string = string.translate(
+        str.maketrans(
+            {
+                12288: 32,  # 全角空格转半角空格
+                65281: 40,  # 全角感叹号转半角感叹号
+                65282: 41,  # 全角问号转半角问号
+                65288: 46,  # 全角句号转半角句号
+                65292: 44,  # 全角逗号转半角逗号
+                65306: 58,  # 全角冒号转半角冒号
+                65311: 63,  # 全角问号转半角问号
+                65317: 59,  # 全角分号转半角分号
+                12289: 46,  # 另一种全角句号转半角句号
+                65284: 39,  # 全角撇号转半角撇号
+                65285: 39,  # 另一种全角撇号转半角撇号
+                65286: 34,  # 全角双引号转半角双引号
+                65287: 34,  # 另一种全角双引号转半角双引号
+            }
+        )
+    )
+    string = re.sub(r"\s+", " ", string)
+    # 替换中文引号为英文引号
+    string = re.sub(r"[“”]", '"', string)
+    string = re.sub(r"[‘’]", "'", string)
+    # 替换中文句号为英文句号
+    string = re.sub(r"。", ".", string)
+    while string and string[-1] in ".,;:!?。：、，；！？":
+        string = string[:-1]
+
+    return string.strip()
 
 
 class YKTBase:
     """YKT数据库"""
 
     def __init__(self) -> None:
-        self.connect = sqlite3.connect(DATABASE_PATH)  # 连接数据库，没有就创建
-        self.cursor = self.connect.cursor()  # 获取游标
+        self.url = URL
 
-    def search(self, question, table="QUIZ"):
+    @property
+    def headers(self):
+        return {
+            "authorization": "esqxlRkSQsfCJ95KTkKu",
+            "Content-Type": "application/json",
+        }
+
+    def search(self, question):
         """
-        查询表中给定question对应的answer。
+        查询
 
         :param question: 需要查询的问题
         :return: 如果找到答案则返回答案，否则返回None
         """
-        self.cursor.execute(
-            f"SELECT answer FROM {table} WHERE question LIKE ?", (question,)
-        )
-        result = self.cursor.fetchone()
-        if result:
-            return result[0]
-        else:
-            return None
+        data = {"question": question}
+        res = requests.post(f"{self.url}/query", headers=self.headers, json=data).json()
+        # none或答案
+        return res["data"]["answer"]
 
-    def submit(self, question, answer, table="QUIZ"):
-        # 创建表单并添加数据
-        self.cursor.execute(
-            f"CREATE TABLE IF NOT EXISTS {table} (question TEXT PRIMARY KEY NOT NULL, answer TEXT NOT NULL);"
-        )
-
-        self.cursor.execute(
-            f"insert or ignore into {table} (question,answer) values (?,?)",
-            (question, answer),
-        )
-
-        # self.cursor.close()
-        self.connect.commit()  # 提交更改
-
-    def printAllCaptcha(self):
-        # 查询CAPTCHA表下全部数据并输出
-        for question, answer in self.cursor.execute("select * from CAPTCHA").fetchall():
-            print(question, answer)
-
-    def length(self, table="CAPTCHA"):
-        # 使用 COUNT(*) 来计算表中的所有行
-        self.cursor.execute(f"SELECT COUNT(*) FROM {table};")
-        # 获取结果
-        count = self.cursor.fetchone()[0]
-        return count
-
-    def close(self):
-        self.cursor.close()  # 关闭游标
-        self.connect.close()  # 关闭数据库连接
+    def submit(self, question, answer):
+        data = {"question": question, "answer": answer}
+        requests.post(f"{self.url}/submit", headers=self.headers, json=data)
