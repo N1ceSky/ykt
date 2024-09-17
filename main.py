@@ -1,22 +1,27 @@
 import asyncio
 import datetime
-import os
-import pickle
 import random
 import time
 
 import toml
-from prettytable import PrettyTable
+from prettytable import SINGLE_BORDER, PrettyTable
 from tqdm import tqdm
 
-from ykt import YKT
+from database import YKTBase
+from decode import decrypt
+from ykt import YKT, CookiesManager
 
 config = toml.load("config.toml")
+# 记录已经做过的题目
+isRecord = config.get("isRecord", True)
+# 默认不跳过答题
+isSkipQuiz = config.get("isSkipQuiz", False)
 
 
 def printCourseList(courseList):
     """打印课程列表"""
     table = PrettyTable()
+    table.set_style(SINGLE_BORDER)
     table.field_names = ["课程", "考试"]
     for index, course in enumerate(courseList):
         table.add_row(
@@ -26,6 +31,19 @@ def printCourseList(courseList):
             ]
         )
     print("\n" + table.get_string() + "\n")
+
+
+def printCourseSchedule(title, detail):
+    """打印课程进度"""
+    table = PrettyTable()
+    table.title = title
+    table.field_names = ["视频进度", "课程得分"]
+    table.min_width = len(title)
+    table.add_row(
+        [f"{detail['videos_complete_progress']*100:.2f}%", detail["user_final_score"]]
+    )
+    table.set_style(SINGLE_BORDER)
+    print("\n" + table.get_string())
 
 
 def delay(left=10, right=20):
@@ -75,7 +93,6 @@ def copeVedio(leaf):
                 ykt.cp = 0
             if data["rate"] >= 0.99:
                 pbar.update(pbar.total - pbar.n)
-
                 break
             else:
                 time.sleep(5)
@@ -88,53 +105,178 @@ def copeDiscuss(leaf):
     """处理讨论任务"""
 
 
+def record(question, options, answer, ptype):
+    """记录正确答案"""
+    if ptype == 6:
+        # 判断题
+        answer = ["A" if answer[0] == "true" else "B"]
+
+    if ptype == 4:
+        # 填空题 存储时不排序
+        # 默认只有一个元素
+        answer = [ans[0] for ans in answer.values()]
+        db.submit(question, "|".join(answer))
+    else:
+        db.submit(
+            "|".join([question, *sorted(options.values())]),
+            "|".join(sorted([options[ans] for ans in answer])),
+        )
+
+
+def choice(ProblemType, options):
+    """处理单选多选判断题"""
+    while True:
+        answer = input("请输入答案：").strip().upper()
+        # 防呆
+        if ProblemType in [1, 6] and len(answer) == 1 and answer in options.keys():
+            # 单选1和判断6 只有一个选项
+            answer = [answer]
+            break
+        elif ProblemType in [2] and len(answer) > 1:
+            # 多选
+            answer_ = [ans for ans in answer if ans in options.keys()]
+            if len(answer) == len(answer_):
+                answer = answer_
+                break
+    return answer
+
+
 def copeQuiz(leaf):
     """处理答题任务"""
+    ykt.leafStatus = ykt.getLeafInfo(leaf["id"])["data"]
+    quizLeafInfo = ykt.getProblems()["data"]
+    print("\n" + quizLeafInfo["name"])
+    problems = quizLeafInfo["problems"]
+    # 字体链接
+    ttf_url = quizLeafInfo["font"]
+    for index, problem in enumerate(problems):
+        problemInfo = problem["content"]
+        ProblemType = problemInfo["ProblemType"]
+        question = decrypt(problemInfo["Body"], ttf_url)
+        if ProblemType == 6:
+            options = {
+                "A": "正确" if problemInfo["Options"][0]["key"] == "true" else "错误",
+                "B": "正确" if problemInfo["Options"][1]["key"] == "true" else "错误",
+            }
+        elif ProblemType == 4:
+            # 填空题
+            options = {}
+        else:
+            options = {
+                o["key"]: decrypt(o["value"], ttf_url) for o in problemInfo["Options"]
+            }
+        if problem["user"]["my_count"] > 0:
+            if isRecord:
+                # 记录答案
+                record(
+                    question,
+                    options,
+                    problem["user"]["answers" if ProblemType == 4 else "answer"],
+                    ProblemType,
+                )
+                print("收录 =>", question)
+            # 跳过做过的题
+            continue
+        # 查询结果是 答案1|答案2 的形式 需要转换为选项
+        answer = db.search(f"%{'|'.join([question, *sorted(options.values())])}%")
+        if answer:
+            if ProblemType == 4:
+                answer = {i: ans for i, ans in enumerate(answer.split("|"))}
+            else:
+                options_ = {v: k for k, v in options.items()}
+                answer = [options_[ans] for ans in answer.split("|")]
+        else:
+            # 打印题目
+            print(f"\n{index+1}/{len(problems)}", problemInfo["TypeText"], question)
+            for k, v in options.items():
+                print(f"{k}:", v)
+            # 手动填写
+            if ProblemType == 4:
+                answer = {}
+                for blank in problemInfo["Blanks"]:
+                    answer[str(blank["Num"])] = input(f"第{blank["Num"]}空：").strip()
+            else:
+                answer = choice(ProblemType, options)
+
+        if ProblemType == 6:
+            # 判断题
+            answer = ["true" if options[answer[0]] == "正确" else "false"]
+        data = ykt.submitProblem(
+            answer,
+            problem["problem_id"],
+            key="answers" if ProblemType == 4 else "answer",
+        )["data"]
+        # 记录正确答案
+        record(
+            question,
+            options,
+            data["answers" if ProblemType == 4 else "answer"],
+            ProblemType,
+        )
+        print(
+            "🎉 回答正确" if data["is_correct"] else "🔨 回答错误",
+            f"得分：{data['my_score']} / {problem['score']}",
+        )
+        time.sleep(1)
+
+
+def copeGraphic(leaf):
+    ykt.leafStatus = ykt.getLeafInfo(leaf["id"])["data"]
+    ykt.read(leafId=leaf["id"])
+    print("\n图文", ykt.leafStatus["name"], "已读")
+    time.sleep(1)
 
 
 def copeLeaf(leaf):
     """处理leaf"""
-    if (id := str(leaf["id"])) in ykt.progess:
-        progess_ = ykt.progess[id]
-        if isinstance(progess_, dict):
-            # 题目类
-            leaf["progess"] = progess_["done"] / progess_["total"]
-        else:
-            leaf["progess"] = progess_
-    else:
-        leaf["progess"] = 0
-    if leaf["progess"] != 1:
-        # 未完成的任务
-        if leaf["leaf_type"] == 0:
+
+    # 未完成的任务
+    if leaf["leaf_type"] == 0:
+        if leaf["schedule"] != 1:
             copeVedio(leaf)
-        elif leaf["leaf_type"] == 4:
-            return
-            # copeDiscuss(leaf)
-        elif leaf["leaf_type"] == 6:
-            return
-            # copeQuiz(leaf)
+    elif leaf["leaf_type"] == 3:
+        if leaf["schedule"] != 1:
+            copeGraphic(leaf)
+    elif leaf["leaf_type"] == 4:
+        return
+        # copeDiscuss(leaf)
+    elif not isSkipQuiz and leaf["leaf_type"] == 6:
+        if isRecord or leaf["schedule"] != 1:
+            # 未完成或者要记录题目
+            copeQuiz(leaf)
 
 
 def copeAct(activities):
     """处理全部活动"""
     for act in activities:
         ykt.current_act = act
-        # 打印任务详情
-        print(
-            f"包含{act['content']['c_n']}章，{act['content']['s_n']}小节，共计{act['content']['l_n']}个学习单元"
-        )
-        # 获取当前活动进度
-        ykt.progess = ykt.getProgess()
+        # 获取当前课程进度
+        detail = ykt.getCourseDetail()["data"]
+        leafInfos = detail["leaf_level_infos"]
+        ykt.progess = {info["id"]: info for info in leafInfos}
         # 拉取章节列表
         courseData = ykt.getCourseContent()
         ykt.content = courseData["data"]["content_info"]
-        # leafTypeDict = {0: "视频", 4: "讨论", 6: "作业"}
+        # 打印任务进度
+        printCourseSchedule(ykt.course_name, detail)
+        # leafTypeDict = {0: "视频", 3: "图文", 4: "讨论", 6: "作业"}
         for charter in ykt.content:
-            for leaf in charter["leaf_list"]:
-                copeLeaf(leaf)
+            schedules = []
             for section in charter["section_list"]:
                 for leaf in section["leaf_list"]:
+                    leaf["schedule"] = ykt.progess.get(leaf["id"], {}).get(
+                        "schedule", 0
+                    )
+                    if leaf["leaf_type"] in [0, 6]:
+                        schedules.append(leaf["schedule"])
                     copeLeaf(leaf)
+            for leaf in charter["leaf_list"]:
+                leaf["schedule"] = ykt.progess.get(leaf["id"], {}).get("schedule", 0)
+                if leaf["leaf_type"] in [0, 6]:
+                    schedules.append(leaf["schedule"])
+                copeLeaf(leaf)
+            if len(schedules) and (sum(schedules) / len(schedules)) < 1:
+                delay(8, 12)
 
 
 def copeCourse():
@@ -153,7 +295,6 @@ def copeCourse():
         if index >= 0 and index < len(courseList):
             break
     ykt.current_course = courseList[index]
-    print(f"开始学习=>{ykt.current_course['course']['name']}")
     # 拉取课程信息
     activities = ykt.getCourseInfo()["data"]["activities"]
     # 有效活动类型 过滤只留下列表内的活动
@@ -164,21 +305,19 @@ def copeCourse():
 
 if __name__ == "__main__":
     ykt = YKT()
-    if os.path.exists("cookies.pkl"):
-        with open("cookies.pkl", "rb") as f:
-            cookies = pickle.load(f)
-        # 失效时间
-        expires_time = min([coo.expires for coo in cookies if coo.expires])
-    else:
-        expires_time = 0
+    manager = CookiesManager()
+    manager.choice()
 
-    if time.time() < expires_time:
+    if time.time() < manager.expires_time and manager.cookies:
         # 传递登录状态
-        ykt.session.cookies = cookies
+        ykt.session.cookies = manager.cookies
         infoData = ykt.checkInfo()
         if infoData["code"] == 0:
             print(f"你好，{infoData['data']['name']}")
             isLogin = True
+            # 账号名和实际名不同也重新登录
+            if infoData["data"]["name"] != manager.name:
+                isLogin = False
         else:
             isLogin = False
     else:
@@ -188,7 +327,11 @@ if __name__ == "__main__":
         print("登录状态失效，重新登录")
         # 运行异步函数
         asyncio.run(ykt.qrLogin())
-        # 保存登录cookie为pkl文件
-        with open("cookies.pkl", "wb") as f:
-            pickle.dump(ykt.session.cookies, f)
+        infoData = ykt.checkInfo()
+        if infoData["code"] == 0:
+            print(f"你好，{infoData['data']['name']}")
+            # 保存登录cookie为pkl文件
+            manager.save(infoData["data"]["name"], ykt.session.cookies)
+    db = YKTBase()
     copeCourse()
+    db.close()
