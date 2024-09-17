@@ -45,6 +45,11 @@ class YKT:
         self.session.headers.update({"User-Agent": UA})
 
     @property
+    def course_name(self):
+        # 返回字符串类型
+        return self.current_course["course"]["name"]
+
+    @property
     def courseware_id(self):
         # 返回字符串类型
         return self.current_act.get("courseware_id", "")
@@ -70,10 +75,13 @@ class YKT:
 
     @property
     def ccid(self):
-        if self.leafStatus:
-            return self.leafStatus["content_info"]["media"]["ccid"]
-        else:
-            return ""
+        """答题任务时media为空对象"""
+        return self.leafStatus.get("content_info", {}).get("media", {}).get("ccid", "")
+
+    @property
+    def leaf_type_id(self):
+        """阅读任务时不存在 答题任务存在"""
+        return self.leafStatus.get("content_info", {}).get("leaf_type_id", 0)
 
     @property
     def id(self):
@@ -91,7 +99,7 @@ class YKT:
     @property
     def sku_id(self):
         """sku_id 例如 10628970"""
-        return self.leafStatus.get("sku_id", "")
+        return self.current_act.get("content", {}).get("sku_id", "")
 
     @property
     def csrf(self):
@@ -371,6 +379,96 @@ class YKT:
 
         response = self.session.get(
             "https://www.yuketang.cn/api/v3/user/basic-info",
+            headers=headers,
+        )
+        return response.json()
+
+    def getCourseDetail(self):
+        headers = {
+            "accept": "application/json, text/plain, */*",
+            "accept-language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+            "priority": "u=1, i",
+            "referer": f"https://www.yuketang.cn/v2/web/studentLog/{self.classroom_id}",
+            "classroom-id": self.classroom_id,
+            "university-id": self.university_id,
+            "uv-id": self.university_id,
+            "x-csrftoken": self.csrf,
+            "xt-agent": "web",
+            "xtbz": "ykt",
+        }
+
+        response = self.session.get(
+            f"https://www.yuketang.cn/c27/online_courseware/schedule/score_detail/single/{self.sku_id}/0/",
+            headers=headers,
+        )
+        return response.json()
+
+    def getProblems(self):
+        headers = {
+            "accept": "application/json, text/plain, */*",
+            "accept-language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+            "priority": "u=1, i",
+            "classroom-id": self.classroom_id,
+            "university-id": self.university_id,
+            "uv-id": self.university_id,
+            "xt-agent": "web",
+            "xtbz": "ykt",
+        }
+
+        response = self.session.get(
+            f"https://www.yuketang.cn/mooc-api/v1/lms/exercise/get_exercise_list/{self.leaf_type_id}/",
+            headers=headers,
+        )
+        return response.json()
+
+    def submitProblem(self, answer, problemId, key="answer"):
+        headers = {
+            "accept": "application/json, text/plain, */*",
+            "accept-language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+            "content-type": "application/json;charset=UTF-8",
+            "origin": "https://www.yuketang.cn",
+            "referer": f"https://www.yuketang.cn/v2/web/cloud/student/exercise/{self.classroom_id}/{self.id}/{self.sku_id}",
+            "classroom-id": self.classroom_id,
+            "university-id": self.university_id,
+            "uv-id": self.university_id,
+            "x-csrftoken": self.csrf,
+            "xt-agent": "web",
+            "xtbz": "ykt",
+        }
+        # 填空题key为answers
+        json_data = {
+            "classroom_id": int(self.classroom_id),
+            "problem_id": problemId,
+            key: answer,
+        }
+
+        response = self.session.post(
+            "https://www.yuketang.cn/mooc-api/v1/lms/exercise/problem_apply/",
+            headers=headers,
+            json=json_data,
+        )
+        return response.json()
+
+    def read(self, leafId):
+        headers = {
+            "accept": "application/json, text/plain, */*",
+            "accept-language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+            "priority": "u=1, i",
+            "classroom-id": self.classroom_id,
+            "university-id": self.university_id,
+            "uv-id": self.university_id,
+            "xt-agent": "web",
+            "xtbz": "ykt",
+        }
+
+        params = {
+            "cid": self.classroom_id,
+            "sid": self.sku_id,
+        }
+
+        response = self.session.get(
+            f"https://www.yuketang.cn/mooc-api/v1/lms/learn/user_article_finish/{leafId}/",
+            params=params,
             headers=headers,
         )
         return response.json()
