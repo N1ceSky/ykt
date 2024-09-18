@@ -65,7 +65,8 @@ def decrypt(htmlStr, ttf_url, sourceTable=source_table):
     soup = BeautifulSoup(htmlStr, "html.parser")
     decryptStrs = []
     encodeTags = soup.find_all("span", class_="xuetangx-com-encrypted-font")
-    encodeStr = [span.text for span in encodeTags]
+    # 标签泄露可能多导致tags内还有span标签 这里只取内容的第一项 第一项一定是一个加密字符串
+    encodeStr = [span.contents[0] for span in encodeTags]
     for text in soup.stripped_strings:
         if text in encodeStr:
             decryptStrs.append(
