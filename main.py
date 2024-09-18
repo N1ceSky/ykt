@@ -338,4 +338,3 @@ if __name__ == "__main__":
             manager.save(infoData["data"]["name"], ykt.session.cookies)
     db = YKTBase()
     copeCourse()
-    db.close()
