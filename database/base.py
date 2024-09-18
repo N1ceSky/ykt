@@ -1,5 +1,3 @@
-import re
-
 import requests
 
 URL = "http://122.51.89.123/tiku/api/v1"
