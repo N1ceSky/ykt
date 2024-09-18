@@ -22,7 +22,7 @@ def printCourseList(courseList):
     """打印课程列表"""
     table = PrettyTable()
     table.set_style(SINGLE_BORDER)
-    table.field_names = ["课程", "考试"]
+    table.field_names = ["#", "课程"]
     for index, course in enumerate(courseList):
         table.add_row(
             [
