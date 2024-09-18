@@ -45,7 +45,8 @@ class CookiesManager:
     def choice(self):
         """打印并选择账户"""
         # 打印
-        self.print()
+        if len(self.allUser) > 0:
+            self.print()
         # 选择
         if len(self.allUser) > 1:
             while True:
