@@ -48,16 +48,13 @@ class CookiesManager:
         if len(self.allUser) > 0:
             self.print()
         # 选择
-        if len(self.allUser) > 1:
-            while True:
-                try:
-                    self.index = int(input("请选择账号："))
-                except Exception:
-                    break
-                if self.index >= 0 and self.index < len(self.allUser):
-                    break
-        elif len(self.allUser) == 1:
-            self.index = 0
+        while True:
+            try:
+                self.index = int(input("请选择账号（留空登录新账号）："))
+            except Exception:
+                break
+            if self.index >= 0 and self.index < len(self.allUser):
+                break
 
     def print(self):
         table = PrettyTable()

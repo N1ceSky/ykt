@@ -226,10 +226,17 @@ def copeQuiz(leaf):
         if problem["user"]["my_count"] > 0:
             if isRecord:
                 # 记录答案
+                if ProblemType == 3:
+                    # 投票 只记录自己的答案
+                    rAnswer = problem["user"]["my_answer"]
+                else:
+                    rAnswer = problem["user"][
+                        "answers" if ProblemType == 4 else "answer"
+                    ]
                 record(
                     question,
                     options,
-                    problem["user"]["answers" if ProblemType == 4 else "answer"],
+                    rAnswer,
                     ProblemType,
                 )
                 print("收录 =>", question)
