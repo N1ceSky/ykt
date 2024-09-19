@@ -1,2 +1,2 @@
-G:\anaconda3\envs\d2l\python main.py
+python main.py
 pause

@@ -1,1 +1,1 @@
-from .decode import decrypt
+from .decode import decrypt, format_string

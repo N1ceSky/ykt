@@ -4,11 +4,12 @@ import random
 import time
 
 import toml
+from bs4 import BeautifulSoup
 from prettytable import SINGLE_BORDER, PrettyTable
 from tqdm import tqdm
 
 from database import YKTBase
-from decode import decrypt
+from decode import decrypt, format_string
 from ykt import YKT, CookiesManager
 
 config = toml.load("config.toml")
@@ -16,6 +17,12 @@ config = toml.load("config.toml")
 isRecord = config.get("isRecord", True)
 # 默认不跳过答题
 isSkipQuiz = config.get("isSkipQuiz", False)
+
+
+def html2Str(htmlStr):
+    soup = BeautifulSoup(htmlStr, "html.parser")
+    texts = [text.strip() for text in soup.stripped_strings]
+    return "\n".join(texts)
 
 
 def printCourseList(courseList):
@@ -31,6 +38,12 @@ def printCourseList(courseList):
             ]
         )
     print("\n" + table.get_string() + "\n")
+
+
+def printDissList(dissList):
+    """打印课程列表"""
+    for index, diss in enumerate(dissList):
+        print(f"\033[92m{index}\033[0m {diss}")
 
 
 def printCourseSchedule(title, detail):
@@ -64,6 +77,24 @@ def delay(left=10, right=20):
     # 显示控制台光标1
     print("\x1b[?25h", end="")
     return sleepTime
+
+
+def inputDiss(discussList):
+    """输入或者选择评论"""
+    while True:
+        prompt = input('输入序号选择已有评论(输入"#"自由输入)：')
+        if prompt.strip() == "#":
+            diss = input("请输入评论：")
+            break
+        else:
+            try:
+                index = int(prompt)
+                if index >= 0 and index < len(discussList):
+                    diss = discussList[index]
+                    break
+            except Exception:
+                pass
+    return diss
 
 
 def copeVedio(leaf):
@@ -107,6 +138,29 @@ def copeVedio(leaf):
 
 def copeDiscuss(leaf):
     """处理讨论任务"""
+    ykt.leafStatus = ykt.getLeafInfo(leaf["id"])["data"]
+    topic = ykt.getDiscussion(
+        leaf["id"], channel=ykt.leafStatus.get("third_platform_code", "")
+    )["data"]
+    topicId = topic["id"]
+    context = html2Str(ykt.leafStatus["content_info"]["context"])
+    query = format_string(context).replace("/n", "")
+    diss = db.searchDiss(query)
+    print("\n讨论", ykt.leafStatus["name"] + "\n" + context)
+    if not diss:
+        data = ykt.getDiscussionList(leaf["id"], topicId)["data"]
+        discussList_ = (
+            data["good_comment_list"]["results"] + data["new_comment_list"]["results"]
+        )
+        discussList = [diss["content"]["text"] for diss in discussList_[:5]]
+        printDissList(discussList)
+        diss = inputDiss(discussList)
+        db.submitDiss(query, diss)
+    # 提交评论
+    data = ykt.comment(
+        leafId=leaf["id"], topicId=topicId, toUserId=topic["user_id"], text=diss
+    )
+    print("提交", diss)
 
 
 def record(question, options, answer, ptype):
@@ -132,12 +186,12 @@ def choice(ProblemType, options):
     while True:
         answer = input("请输入答案：").strip().upper()
         # 防呆
-        if ProblemType in [1, 6] and len(answer) == 1 and answer in options.keys():
-            # 单选1和判断6 只有一个选项
+        if ProblemType in [1, 3, 6] and len(answer) == 1 and answer in options.keys():
+            # 单选1 投票3 和判断6 只有一个选项
             answer = [answer]
             break
-        elif ProblemType in [2] and len(answer) > 1:
-            # 多选
+        elif ProblemType in [2, 3] and len(answer) >= 1:
+            # 多选 投票3
             answer_ = [ans for ans in answer if ans in options.keys()]
             if len(answer) == len(answer_):
                 answer = answer_
@@ -242,8 +296,9 @@ def copeLeaf(leaf):
         if leaf["schedule"] != 1:
             copeGraphic(leaf)
     elif leaf["leaf_type"] == 4:
-        return
-        # copeDiscuss(leaf)
+        # 无法获取发言列表无法记录之前的讨论
+        if leaf["schedule"] != 1:
+            copeDiscuss(leaf)
     elif not isSkipQuiz and leaf["leaf_type"] == 6:
         if isRecord or leaf["schedule"] != 1:
             # 未完成或者要记录题目

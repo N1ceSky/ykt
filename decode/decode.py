@@ -59,7 +59,7 @@ def format_string(string):
 
 
 def decrypt(htmlStr, ttf_url, sourceTable=source_table):
-    if ttf_url not in cache:
+    if ttf_url and ttf_url not in cache:
         gen_table(ttf_url, sourceTable)
 
     soup = BeautifulSoup(htmlStr, "html.parser")

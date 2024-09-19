@@ -450,6 +450,9 @@ class YKT:
         return response.json()
 
     def read(self, leafId):
+        """
+        阅读图文
+        """
         headers = {
             "accept": "application/json, text/plain, */*",
             "accept-language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
@@ -470,5 +473,96 @@ class YKT:
             f"https://www.yuketang.cn/mooc-api/v1/lms/learn/user_article_finish/{leafId}/",
             params=params,
             headers=headers,
+        )
+        return response.json()
+
+    def getDiscussionList(self, leafId, topicId):
+        """获取讨论列表"""
+
+        headers = {
+            "accept": "application/json, text/plain, */*",
+            "accept-language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+            "referer": f"https://www.yuketang.cn/v2/web/lms/21575253/forum/{leafId}",
+            "priority": "u=1, i",
+            "classroom-id": self.classroom_id,
+            "university-id": self.university_id,
+            "uv-id": self.university_id,
+            "xt-agent": "web",
+            "xtbz": "ykt",
+        }
+
+        params = {
+            "offset": "0",
+            "limit": "10",
+            "web": "web",
+        }
+
+        response = self.session.get(
+            f"https://www.yuketang.cn/v/discussion/v2/comment/list/{topicId}/",
+            params=params,
+            headers=headers,
+        )
+        return response.json()
+
+    def getDiscussion(self, leafId, channel):
+        headers = {
+            "accept": "application/json, text/plain, */*",
+            "accept-language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+            "priority": "u=1, i",
+            "referer": f"https://www.yuketang.cn/v2/web/lms/{self.classroom_id}/forum/{self.id}",
+            "classroom-id": self.classroom_id,
+            "university-id": self.university_id,
+            "uv-id": self.university_id,
+            "x-csrftoken": self.csrf,
+            "xt-agent": "web",
+            "xtbz": "ykt",
+        }
+
+        params = {
+            "classroom_id": self.classroom_id,
+            "sku_id": str(self.sku_id),
+            "leaf_id": str(leafId),
+            "topic_type": "4",
+        }
+        if channel:
+            params["channel"] = channel
+
+        response = self.session.get(
+            "https://www.yuketang.cn/v/discussion/v2/unit/discussion/",
+            params=params,
+            headers=headers,
+        )
+        return response.json()
+
+    def comment(self, leafId, topicId, toUserId, text):
+        headers = {
+            "accept": "application/json, text/plain, */*",
+            "accept-language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+            "content-type": "application/json;charset=UTF-8",
+            "origin": "https://www.yuketang.cn",
+            "priority": "u=1, i",
+            "referer": f"https://www.yuketang.cn/v2/web/lms/{self.classroom_id}/forum/{self.id}",
+            "classroom-id": self.classroom_id,
+            "university-id": self.university_id,
+            "uv-id": self.university_id,
+            "x-csrftoken": self.csrf,
+            "xt-agent": "web",
+            "xtbz": "ykt",
+        }
+        # to_user 50541248   topic_id 17240941
+        json_data = {
+            "to_user": toUserId,
+            "topic_id": topicId,
+            "content": {
+                "text": text,
+                "upload_images": [],
+                "accessory_list": [],
+            },
+        }
+
+        response = self.session.post(
+            "https://www.yuketang.cn/v/discussion/v2/comment/",
+            headers=headers,
+            json=json_data,
         )
         return response.json()

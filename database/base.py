@@ -31,3 +31,21 @@ class YKTBase:
     def submit(self, question, answer):
         data = {"question": question, "answer": answer}
         requests.post(f"{self.url}/submit", headers=self.headers, json=data)
+
+    def searchDiss(self, question):
+        """
+        查询
+
+        :param question: 需要查询的问题
+        :return: 如果找到答案则返回答案，否则返回None
+        """
+        data = {"question": question}
+        res = requests.post(
+            f"{self.url}/querydiss", headers=self.headers, json=data
+        ).json()
+        # none或答案
+        return res["data"]["answer"]
+
+    def submitDiss(self, question, answer):
+        data = {"question": question, "answer": answer}
+        requests.post(f"{self.url}/submitdiss", headers=self.headers, json=data)
