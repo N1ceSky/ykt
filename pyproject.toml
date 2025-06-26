@@ -1,0 +1,16 @@
+[project]
+name = "ykt"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "beautifulsoup4>=4.13.4",
+    "fonttools>=4.58.4",
+    "prettytable>=3.16.0",
+    "qrcode>=8.2",
+    "requests>=2.32.4",
+    "toml>=0.10.2",
+    "tqdm>=4.67.1",
+    "websockets>=15.0.1",
+]

@@ -1,3 +1,7 @@
 cookies
 __pycache__
 *.bat
+*.py[ocd]
+*.xml
+output
+.venv

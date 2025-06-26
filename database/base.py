@@ -1,6 +1,14 @@
-import requests
+import sys
 
-URL = "http://122.51.89.123/tiku/api/v1"
+import requests
+import toml
+
+try:
+    URL = toml.load("./config.toml")["tiku"]["url"]
+    assert URL, "无效的题库url"
+except Exception:
+    print("无效的题库url")
+    sys.exit()
 
 
 class YKTBase:
@@ -47,5 +55,7 @@ class YKTBase:
         return res["data"]["answer"]
 
     def submitDiss(self, question, answer):
+        data = {"question": question, "answer": answer}
+        requests.post(f"{self.url}/submitdiss", headers=self.headers, json=data)
         data = {"question": question, "answer": answer}
         requests.post(f"{self.url}/submitdiss", headers=self.headers, json=data)

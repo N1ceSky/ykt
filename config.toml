@@ -1,3 +1,6 @@
 isFilter = true
-isRecord = true
+isRecord = false
 isSkipQuiz = false
+
+[tiku]
+url = ""

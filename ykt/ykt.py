@@ -143,7 +143,7 @@ class YKT:
             "from": "web",
         }
 
-        async with websockets.connect(url, extra_headers=headers) as websocket:
+        async with websockets.connect(url, additional_headers=headers) as websocket:
             # 将字典转换为JSON字符串并发送
             json_data = json.dumps(data)
             await websocket.send(json_data)

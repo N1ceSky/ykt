@@ -5,7 +5,7 @@ import time
 
 import toml
 from bs4 import BeautifulSoup
-from prettytable import SINGLE_BORDER, PrettyTable
+from prettytable import PrettyTable, TableStyle
 from tqdm import tqdm
 
 from database import YKTBase
@@ -28,7 +28,7 @@ def html2Str(htmlStr):
 def printCourseList(courseList):
     """打印课程列表"""
     table = PrettyTable()
-    table.set_style(SINGLE_BORDER)
+    table.set_style(TableStyle.SINGLE_BORDER)
     table.field_names = ["#", "课程"]
     for index, course in enumerate(courseList):
         table.add_row(
@@ -53,9 +53,9 @@ def printCourseSchedule(title, detail):
     table.field_names = ["视频进度", "课程得分"]
     table.min_width = len(title)
     table.add_row(
-        [f"{detail['videos_complete_progress']*100:.2f}%", detail["user_final_score"]]
+        [f"{detail['videos_complete_progress'] * 100:.2f}%", detail["user_final_score"]]
     )
-    table.set_style(SINGLE_BORDER)
+    table.set_style(TableStyle.SINGLE_BORDER)
     print("\n" + table.get_string())
 
 
@@ -252,7 +252,7 @@ def copeQuiz(leaf):
                 answer = [options_[ans] for ans in answer.split("|")]
         else:
             # 打印题目
-            print(f"\n{index+1}/{len(problems)}", problemInfo["TypeText"], question)
+            print(f"\n{index + 1}/{len(problems)}", problemInfo["TypeText"], question)
             for k, v in options.items():
                 print(f"{k}:", v)
             # 手动填写
@@ -351,9 +351,7 @@ def copeCourse():
     # 过滤 只显示当年的课程
     if config.get("isFilter", True):
         year = datetime.datetime.now().year
-        courseList = [
-            course for course in courseList if year == int(course["term"] / 100)
-        ]
+        courseList = [course for course in courseList if str(year) in course["name"]]
     printCourseList(courseList)
     # 选课程 序号从0开始 对应printCourseList中的序号
     while True:
